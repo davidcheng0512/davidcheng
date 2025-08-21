@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TWC Timetable Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Consistent light gray background */
+            color: #1f2937; /* Consistent dark text color */
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .timetable-dark ::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .timetable-cell {
+            border-right: 1px solid;
+            border-bottom: 1px solid;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 transition-colors duration-300">
+
+    <div class="container mx-auto p-4 md:p-6">
+        <header class="text-center mb-6">
+            <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">TWC Timetable Generator</h1>
+            <p class="text-sm md:text-base text-gray-600 mt-2">Paste your course data to generate a weekly schedule.</p>
+        </header>
+
+        <!-- Warning for Desktop Use -->
+        <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg mb-6" role="alert">
+            <p class="font-bold">Reminder: This generator works best on desktop.</p>
+            <p class="text-sm">On mobile, downloading images may fail. For the best experience, please use a computer.</p>
+        </div>
+
+        <div class="flex flex-col gap-6">
+            <!-- Top Section: Controls and Input -->
+            <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-lg">
+                <div class="flex flex-col lg:flex-row gap-6">
+                    <!-- Input Data Section -->
+                    <div class="lg:w-1/3 flex flex-col gap-4">
+                        <h2 class="text-lg sm:text-xl font-semibold mb-2">1. Paste Timetable Data</h2>
+                        <p class="text-xs text-gray-500 mb-2">Go to: <a href="https://selfservice.twc.edu.hk/PowerCampusSelfService/Registration/Schedule" target="_blank" class="text-blue-600 hover:underline">Self-Service</a> > List mode > Ctrl+A > Ctrl+C > Paste below</p>
+                        <textarea id="timetable-data" rows="10" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="Paste your raw timetable data here..."></textarea>
+                        <button id="generate-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-105">
+                            Generate Timetable
+                        </button>
+                    </div>
+
+                    <!-- Customization Section -->
+                    <div class="lg:w-2/3">
+                        <h2 class="text-lg sm:text-xl font-semibold mb-2">2. Customize Appearance</h2>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Theme Toggle -->
+                            <div class="flex justify-between items-center p-3 rounded-lg bg-gray-100">
+                                <label for="theme-toggle" class="text-sm font-medium">Timetable Theme</label>
+                                <button id="theme-toggle" class="px-4 py-2 rounded-lg text-sm font-medium bg-white shadow-sm">
+                                    <span class="light-mode-icon">🌙 Dark</span>
+                                    <span class="dark-mode-icon hidden">☀️ Light</span>
+                                </button>
+                            </div>
+                            <!-- Color Palette -->
+                            <div class="flex justify-between items-center p-3 rounded-lg bg-gray-100">
+                                <label for="color-palette" class="text-sm font-medium">Color Palette</label>
+                                <select id="color-palette" class="p-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500">
+                                    <option value="default">Default</option>
+                                    <option value="pastel">Pastel</option>
+                                    <option value="vintage">Vintage</option>
+                                    <option value="neon">Neon</option>
+                                    <option value="ocean">Ocean</option>
+                                    <option value="forest">Forest</option>
+                                    <option value="sunset">Sunset</option>
+                                    <option value="monochrome">Monochrome</option>
+                                    <option value="berry">Berry</option>
+                                    <option value="custom">custom</option>
+                                </select>
+                            </div>
+                            <!-- Show Time Toggle -->
+                            <div class="flex justify-between items-center p-3 rounded-lg bg-gray-100">
+                                <label for="show-time-toggle" class="text-sm font-medium">Show Class Time</label>
+                                <input type="checkbox" id="show-time-toggle" class="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer" checked>
+                            </div>
+                            <!-- Note Position -->
+                            <div class="flex justify-between items-center p-3 rounded-lg bg-gray-100">
+                                <label for="note-position" class="text-sm font-medium">Note Position</label>
+                                <select id="note-position" class="p-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500">
+                                    <option value="above">Above Title</option>
+                                    <option value="below">Below Location</option>
+                                </select>
+                            </div>
+                        </div>
+                        <!-- Custom Color Picker -->
+                        <div id="custom-colors" class="hidden mt-4">
+                            <h3 class="font-semibold text-base mb-2">3. Customize Course Colors</h3>
+                            <div id="custom-color-pickers" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+                        </div>
+                        <!-- Additional Info Section -->
+                        <div id="additional-info-container" class="hidden mt-4">
+                            <h3 class="font-semibold text-base mb-2">4. Add Notes for Specific Classes</h3>
+                            <div id="additional-info-inputs" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 grid grid-cols-1 gap-4">
+                    <button id="mobile-download-btn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                        Generate Mobile Size Image
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bottom Section: Timetable Display -->
+            <div>
+                <div id="timetable-container-wrapper" class="w-full overflow-x-auto bg-white p-4 rounded-2xl shadow-lg transition-colors duration-300">
+                    <div id="timetable-container" class="min-w-[720px]">
+                        <!-- Timetable will be generated here -->
+                        <div class="flex justify-center items-center h-96 text-gray-400">
+                            <p>Your timetable will be displayed here.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <footer class="text-center mt-8 text-sm text-gray-500">
+                <p>&copy; David Cheng</p>
+            </footer>
+        </div>
+
+        <script>
+            // DOM Elements
+            const generateBtn = document.getElementById('generate-btn');
+            const mobileDownloadBtn = document.getElementById('mobile-download-btn');
+            const dataInput = document.getElementById('timetable-data');
+            const timetableContainer = document.getElementById('timetable-container');
+            const colorPaletteSelect = document.getElementById('color-palette');
+            const customColorsContainer = document.getElementById('custom-colors');
+            const customColorPickers = document.getElementById('custom-color-pickers');
+            const additionalInfoContainer = document.getElementById('additional-info-container');
+            const additionalInfoInputs = document.getElementById('additional-info-inputs');
+            const themeToggle = document.getElementById('theme-toggle');
+            const showTimeToggle = document.getElementById('show-time-toggle');
+            const notePositionSelect = document.getElementById('note-position');
+            const wrapper = document.getElementById('timetable-container-wrapper');
+
+            // State
+            let parsedCourses = [];
+            let courseColors = new Map();
+            let uniqueCourses = [];
+            let additionalInfo = new Map();
+            
+            // Color Palettes
+            const palettes = {
+                default: ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'],
+                pastel: ['#fecaca', '#bfdbfe', '#bbf7d0', '#fef08a', '#ddd6fe', '#fbcfe8', '#99f6e4', '#fed7aa'],
+                vintage: ['#d5a37d', '#a0522d', '#8b4513', '#bc8f8f', '#f4a460', '#d2b48c', '#cd853f', '#bdb76b'],
+                neon: ['#39ff14', '#ff073a', '#00cff0', '#ff1dce', '#f8ff01', '#ffac01', '#ff00ff', '#00ffff'],
+                ocean: ['#0369a1', '#06b6d4', '#67e8f9', '#0891b2', '#0e7490', '#164e63', '#a5f3fc', '#cffafe'],
+                forest: ['#166534', '#15803d', '#22c55e', '#4ade80', '#86efac', '#5d4037', '#795548', '#a1887f'],
+                sunset: ['#ea580c', '#f97316', '#fb923c', '#f9a8d4', '#f472b6', '#ec4899', '#db2777', '#be185d'],
+                monochrome: ['#d1d5db', '#9ca3af', '#6b7280', '#4b5563', '#374151', '#1f2937', '#e5e7eb', '#f3f4f6'],
+                berry: ['#8e24aa', '#d81b60', '#c2185b', '#e91e63', '#9c27b0', '#6a1b9a', '#4a148c', '#ad1457']
+            };
+
+            // --- Core Functions ---
+
+            /**
+             * Determines if a background color is light or dark for text contrast.
+             */
+            function getContrastTextColor(hexcolor){
+                if (!hexcolor) return 'text-white';
+                hexcolor = hexcolor.replace("#", "");
+                const r = parseInt(hexcolor.substr(0,2),16);
+                const g = parseInt(hexcolor.substr(2,2),16);
+                const b = parseInt(hexcolor.substr(4,2),16);
+                const yiq = ((r*299)+(g*587)+(b*114))/1000;
+                return (yiq >= 128) ? 'text-gray-800' : 'text-white';
+            }
+
+            /**
+             * Parses the raw text data into course objects.
+             */
+            function parseTimetableData(data) {
+                const courses = [];
+                const entries = data.split('REGISTERED').filter(entry => entry.trim() !== '');
+
+                entries.forEach(entry => {
+                    const titleMatch = entry.match(/Course Title: (.*?)\s\|/);
+                    const timeMatch = entry.match(/(\d{2}:\d{2})\s-\s(\d{2}:\d{2})/);
+                    const dayMatch = entry.match(/\b(MON|TUE|WED|THU|FRI|SAT)\b/);
+                    const roomMatch = entry.match(/\b([A-Z]{3}-[\w\d-]+)\b/);
+                    const typeMatch = entry.match(/\b(Lecture|Seminar|Laboratory)\b/i);
+                    
+                    const typeMap = { 'lecture': 'LEC', 'seminar': 'SEM', 'laboratory': 'LAB' };
+                    let courseType = '';
+                    if (typeMatch) {
+                        courseType = typeMap[typeMatch[0].toLowerCase()];
+                    }
+
+                    if (titleMatch && timeMatch && dayMatch && roomMatch) {
+                        courses.push({
+                            title: titleMatch[1].trim(),
+                            startTime: timeMatch[1],
+                            endTime: timeMatch[2],
+                            day: dayMatch[1],
+                            room: roomMatch[1],
+                            type: courseType
+                        });
+                    }
+                });
+                return courses;
+            }
+
+            /**
+             * Assigns colors to each unique course.
+             */
+            function assignColors() {
+                const paletteKey = colorPaletteSelect.value;
+                courseColors.clear();
+                uniqueCourses = [...new Set(parsedCourses.map(c => c.title))];
+
+                if (paletteKey === 'custom') {
+                    uniqueCourses.forEach(title => {
+                        const idSafeTitle = title.replace(/\s|[^a-zA-Z0-9]/g, '-');
+                        const picker = document.getElementById(`color-${idSafeTitle}`);
+                        if (picker) {
+                            courseColors.set(title, picker.value);
+                        }
+                    });
+                    return;
+                }
+
+                const selectedPalette = palettes[paletteKey];
+                uniqueCourses.forEach((title, index) => {
+                    courseColors.set(title, selectedPalette[index % selectedPalette.length]);
+                });
+            }
+
+            /**
+             * Renders the entire timetable grid.
+             */
+            function renderTimetable(isMobile = false) {
+                if (parsedCourses.length === 0) {
+                    timetableContainer.innerHTML = `<div class="flex justify-center items-center h-96 text-gray-400"><p>No valid course data found. Please check your input.</p></div>`;
+                    mobileDownloadBtn.disabled = true;
+                    return;
+                }
+                
+                mobileDownloadBtn.disabled = false;
+                assignColors();
+
+                const hasSaturday = parsedCourses.some(c => c.day === 'SAT');
+                const days = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+                if (hasSaturday) days.push('SAT');
+
+                let minHour = 24;
+                let maxHour = 0;
+                parsedCourses.forEach(course => {
+                    const startHour = parseInt(course.startTime.split(':')[0]);
+                    const [endH_orig, endM_orig] = course.endTime.split(':').map(Number);
+                    const endHour = endM_orig > 0 ? endH_orig + 1 : endH_orig;
+                    if (startHour < minHour) minHour = startHour;
+                    if (endHour > maxHour) maxHour = endHour;
+                });
+                
+                if (minHour > maxHour) { minHour = 8; maxHour = 18; }
+                if (isMobile) {
+                    minHour = 8;
+                    maxHour = 22;
+                }
+
+                const hourHeight = 80; // Fixed value since slider is removed
+                const isTimetableDark = wrapper.classList.contains('timetable-dark');
+                const showTimes = showTimeToggle.checked;
+                const notePosition = notePositionSelect.value;
+
+                wrapper.style.backgroundColor = isTimetableDark ? '#1f2937' : '#ffffff';
+                
+                const headerBg = isTimetableDark ? 'bg-gray-800' : 'bg-white';
+                const textColor = isTimetableDark ? 'text-gray-200' : 'text-gray-800';
+                const timeColor = isTimetableDark ? 'text-gray-400' : 'text-gray-500';
+                const borderColor = isTimetableDark ? 'border-gray-700' : 'border-gray-200';
+
+                const timeColumnWidth = '80px'; 
+                const gridTemplateColumns = `grid-template-columns: ${timeColumnWidth} repeat(${days.length}, minmax(0, 1fr));`;
+                
+                // Adjust container size for mobile layout
+                if (isMobile) {
+                     timetableContainer.style.width = '375px'; // Standard mobile portrait width
+                     wrapper.style.minWidth = 'auto';
+                } else {
+                     timetableContainer.style.width = '100%'; // Fixed value since slider is removed
+                     wrapper.style.minWidth = '720px';
+                }
+                
+                let headerHtml = `<div class="grid sticky top-0 ${headerBg} ${textColor} z-20" style="${gridTemplateColumns}">`;
+                headerHtml += `<div class="p-2 font-semibold text-center ${borderColor}">Time</div>`;
+                days.forEach(day => {
+                    headerHtml += `<div class="p-2 font-semibold text-center border-l ${borderColor}">${day}</div>`;
+                });
+                headerHtml += '</div>';
+
+                let bodyHtml = `<div class="relative grid" style="${gridTemplateColumns} height: ${(maxHour - minHour) * hourHeight}px;">`;
+
+                bodyHtml += `<div>`;
+                for (let hour = minHour; hour < maxHour; hour++) {
+                    bodyHtml += `<div class="text-center text-sm ${timeColor} pt-1" style="height: ${hourHeight}px;">${hour.toString().padStart(2, '0')}:00</div>`;
+                }
+                bodyHtml += '</div>';
+
+                days.forEach(day => {
+                    bodyHtml += `<div class="relative timetable-cell ${borderColor}" data-day="${day}"></div>`;
+                });
+                
+                for (let hour = minHour; hour < maxHour; hour++) {
+                    bodyHtml += `<div class="absolute left-0 right-0 border-b border-dashed ${borderColor} z-0" style="top: ${(hour - minHour + 1) * hourHeight}px; grid-column: 1 / -1;"></div>`;
+                }
+
+                bodyHtml += '</div>';
+                timetableContainer.innerHTML = headerHtml + bodyHtml;
+
+                parsedCourses.forEach((course, index) => {
+                    const dayContainer = timetableContainer.querySelector(`[data-day="${course.day}"]`);
+                    if (!dayContainer) return;
+
+                    const [startH, startM] = course.startTime.split(':').map(Number);
+                    const [endH_orig, endM_orig] = course.endTime.split(':').map(Number);
+                    const endH = endM_orig > 0 ? endH_orig + 1 : endH_orig;
+                    const endM = 0;
+
+                    const top = ((startH - minHour) * 60 + startM) / 60 * hourHeight;
+                    const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+                    const height = (durationMinutes / 60) * hourHeight;
+                    
+                    if (top < 0 || top + height > (maxHour - minHour) * hourHeight) return;
+
+                    const courseBlock = document.createElement('div');
+                    courseBlock.className = 'absolute w-full p-2 rounded-lg border text-xs overflow-hidden flex flex-col items-center justify-center z-10';
+                    courseBlock.style.top = `${top}px`;
+                    courseBlock.style.height = `${height - 2}px`;
+                    courseBlock.style.left = '0px';
+                    
+                    const color = courseColors.get(course.title);
+                    const courseTextColor = getContrastTextColor(color);
+                    const extraInfo = additionalInfo.get(index) || '';
+                    const extraInfoHtml = extraInfo ? `<p class="font-semibold mt-1">${extraInfo}</p>` : '';
+
+                    courseBlock.style.backgroundColor = color;
+                    courseBlock.style.borderColor = 'rgba(0,0,0,0.1)';
+                    courseBlock.classList.add(courseTextColor);
+
+                    const titleHtml = `<p class="font-bold">${course.title} ${course.type ? `(${course.type})` : ''}</p>`;
+                    const locationHtml = `<p>${course.room}</p>`;
+                    const timeHtml = `<p class="opacity-80">${showTimes ? `${course.startTime} - ${course.endTime}` : ''}</p>`;
+                    
+                    let innerHtml = '';
+                    if (notePosition === 'above') {
+                        innerHtml = `${extraInfoHtml} ${titleHtml} ${locationHtml} ${timeHtml}`;
+                    } else { // below
+                        innerHtml = `${titleHtml} ${locationHtml} ${extraInfoHtml} ${timeHtml}`;
+                    }
+
+                    courseBlock.innerHTML = `<div class="text-center">${innerHtml}</div>`;
+                    dayContainer.appendChild(courseBlock);
+                });
+            }
+
+            /**
+             * Creates and displays the custom color pickers.
+             */
+            function setupCustomColorPickers() {
+                customColorPickers.innerHTML = '';
+                uniqueCourses.forEach((title, index) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'flex items-center justify-between p-2 rounded-lg bg-gray-100';
+                    const idSafeTitle = title.replace(/\s|[^a-zA-Z0-9]/g, '-');
+                    wrapper.innerHTML = `
+                        <label for="color-${idSafeTitle}" class="text-sm truncate pr-2">${title}</label>
+                        <input type="color" id="color-${idSafeTitle}" value="${palettes.default[index % palettes.default.length]}" class="w-8 h-8 rounded border-none bg-transparent cursor-pointer">
+                    `;
+                    customColorPickers.appendChild(wrapper);
+                    wrapper.querySelector('input').addEventListener('input', () => {
+                        if (colorPaletteSelect.value === 'custom') renderTimetable();
+                    });
+                });
+            }
+
+            /**
+             * Creates and displays the additional info inputs for each specific course block.
+             */
+            function setupAdditionalInfoInputs() {
+                additionalInfoInputs.innerHTML = '';
+                additionalInfoContainer.classList.remove('hidden');
+                parsedCourses.forEach((course, index) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'flex items-center justify-between p-2 rounded-lg bg-gray-100';
+                    const labelText = `${course.title} (${course.day} ${course.startTime})`;
+                    
+                    wrapper.innerHTML = `
+                        <label for="info-${index}" class="text-sm truncate pr-2" title="${labelText}">${labelText}</label>
+                        <input type="text" id="info-${index}" placeholder="Add a note..." class="text-sm p-1 w-24 rounded border-gray-300">
+                    `;
+                    additionalInfoInputs.appendChild(wrapper);
+                    const input = wrapper.querySelector('input');
+                    input.value = additionalInfo.get(index) || '';
+                    input.addEventListener('input', (e) => {
+                        additionalInfo.set(index, e.target.value);
+                        renderTimetable();
+                    });
+                });
+            }
+            
+            // --- Event Listeners ---
+            generateBtn.addEventListener('click', () => {
+                parsedCourses = parseTimetableData(dataInput.value);
+                setupCustomColorPickers();
+                setupAdditionalInfoInputs();
+                customColorsContainer.classList.toggle('hidden', colorPaletteSelect.value !== 'custom');
+                renderTimetable();
+            });
+
+            mobileDownloadBtn.addEventListener('click', () => {
+                const originalWrapperWidth = wrapper.style.width;
+                const originalWrapperMinwidth = wrapper.style.minWidth;
+                const originalContainerWidth = timetableContainer.style.width;
+
+                renderTimetable(true);
+                mobileDownloadBtn.textContent = 'Downloading...';
+                mobileDownloadBtn.disabled = true;
+
+                // Adjust body width to fit the 9:16 aspect ratio
+                const originalBodyWidth = document.body.style.width;
+                document.body.style.width = '375px';
+
+                html2canvas(timetableContainer, {
+                    scale: 3,
+                    useCORS: true,
+                    backgroundColor: wrapper.classList.contains('timetable-dark') ? '#1f2937' : '#ffffff'
+                }).then(canvas => {
+                    // Create a new canvas with 9:16 aspect ratio
+                    const finalCanvas = document.createElement('canvas');
+                    const finalContext = finalCanvas.getContext('2d');
+                    finalCanvas.width = 1080; // 9 * 120
+                    finalCanvas.height = 1920; // 16 * 120
+
+                    // Fill with background color
+                    finalContext.fillStyle = wrapper.classList.contains('timetable-dark') ? '#1f2937' : '#ffffff';
+                    finalContext.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+                    // Draw the generated timetable in the center
+                    const drawWidth = finalCanvas.width * 0.9;
+                    const drawHeight = (canvas.height / canvas.width) * drawWidth;
+                    const drawX = (finalCanvas.width - drawWidth) / 2;
+                    const drawY = (finalCanvas.height - drawHeight) / 2;
+
+                    finalContext.drawImage(canvas, drawX, drawY, drawWidth, drawHeight);
+
+                    const link = document.createElement('a');
+                    link.download = 'TWC_Timetable_Mobile.png';
+                    link.href = finalCanvas.toDataURL('image/png');
+                    link.click();
+                }).catch(err => {
+                    console.error('oops, something went wrong!', err);
+                }).finally(() => {
+                    // Restore original styles
+                    document.body.style.width = originalBodyWidth;
+                    wrapper.style.width = originalWrapperWidth;
+                    wrapper.style.minWidth = originalWrapperMinwidth;
+                    timetableContainer.style.width = originalContainerWidth;
+                    renderTimetable();
+                    mobileDownloadBtn.textContent = 'Generate Mobile Size Image';
+                    mobileDownloadBtn.disabled = false;
+                });
+            });
+
+            colorPaletteSelect.addEventListener('change', () => {
+                customColorsContainer.classList.toggle('hidden', colorPaletteSelect.value !== 'custom');
+                if (parsedCourses.length > 0) renderTimetable();
+            });
+
+            themeToggle.addEventListener('click', () => {
+                wrapper.classList.toggle('timetable-dark');
+                const isDark = wrapper.classList.contains('timetable-dark');
+                themeToggle.querySelector('.light-mode-icon').classList.toggle('hidden', isDark);
+                themeToggle.querySelector('.dark-mode-icon').classList.toggle('hidden', !isDark);
+                if (parsedCourses.length > 0) renderTimetable();
+            });
+
+            notePositionSelect.addEventListener('change', () => {
+                 if (parsedCourses.length > 0) renderTimetable();
+            });
+            
+            // Initial sample data for demonstration
+            dataInput.value = `
+Course Title: Imaging Anatomy | Credits: 0.0 | Credit type: Letter Grade
+10:00 - 11:50
+FRI
+Tung Wah College, King's Park Campus, KPC-907(9/F)
+REGISTERED
+
+Course Title: Imaging Anatomy | Credits: 3.0 | Credit type: Letter Grade
+17:00 - 18:50
+FRI
+Tung Wah College, Mong Kok Campus, MKA-HCLT(2/F)
+REGISTERED
+
+Course Title: Radiation Physics | Credits: 3.0 | Credit type: Letter Grade
+15:00 - 16:50
+TUE
+Tung Wah College, Mong Kok Campus, MKA-801(8/F)
+REGISTERED
+
+Course Title: Radiation Physics | Credits: 0.0 | Credit type: Letter Grade
+17:00 - 17:50
+TUE
+Tung Wah College, Mong Kok Campus, MKA-801(8/F)
+REGISTERED
+
+Course Title: Medical Imaging Instrumentation | Credits: 3.0 | Credit type: Letter Grade
+18:00 - 20:50
+THU
+Tung Wah College, Mong Kok Campus, MKA-501(5/F)
+REGISTERED
+
+Course Title: Medical Imaging Instrumentation | Credits: 0.0 | Credit type: Letter Grade
+12:00 - 13:50
+WED
+Tung Wah College, King's Park Campus, KPC-1101(11/F)
+REGISTERED
+
+Course Title: General Pathology | Credits: 3.0 | Credit type: Letter Grade
+14:00 - 15:50
+FRI
+Tung Wah College, Mong Kok Campus, MKA-HCLT(2/F)
+REGISTERED
+
+Course Title: General Pathology | Credits: 0.0 | Credit type: Letter Grade
+16:00 - 16:50
+FRI
+Tung Wah College, Mong Kok Campus, MKA-801(8/F)
+REGISTERED
+
+Course Title: General Pathology | Credits: 0.0 | Credit type: Letter Grade
+14:00 - 16:50
+MON
+Tung Wah College, King's Park Campus, KPC-130506(13/F)
+REGISTERED
+
+Course Title: Introduction to Statistics | Credits: 0.0 | Credit type: Letter Grade
+15:00 - 16:50
+THU
+Tung Wah College, King's Park Campus, KPC-905(9/F)
+REGISTERED
+
+Course Title: Introduction to Statistics | Credits: 3.0 | Credit type: Letter Grade
+18:00 - 18:50
+MON
+Tung Wah College, Mong Kok Campus, MKB-201(2/F)
+REGISTERED
+        `;
+        </script>
+</body>
+</html>
