@@ -68,7 +68,7 @@
                     <!-- Customization Section -->
                     <div class="lg:w-2/3">
                         <h2 class="text-lg sm:text-xl font-semibold mb-2">2. Customize Appearance</h2>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <!-- Theme Toggle -->
                             <div class="flex justify-between items-center p-3 rounded-lg bg-gray-100">
                                 <label for="theme-toggle" class="text-sm font-medium">Timetable Theme</label>
@@ -105,6 +105,24 @@
                                     <option value="above">Above Title</option>
                                     <option value="below">Below Location</option>
                                 </select>
+                            </div>
+                             <!-- Customize Time Toggle -->
+                            <div class="flex justify-between items-center p-3 rounded-lg bg-gray-100 col-span-1 md:col-span-2">
+                                <label for="custom-time-toggle" class="text-sm font-medium">Customize Time Range</label>
+                                <input type="checkbox" id="custom-time-toggle" class="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer">
+                            </div>
+                            <!-- Start/End Time Controls (visible only when custom-time-toggle is checked) -->
+                            <div id="time-range-controls" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4 col-span-1 md:col-span-2">
+                                <!-- Start Time -->
+                                <div class="flex justify-between items-center p-3 rounded-lg bg-gray-100">
+                                    <label for="start-time" class="text-sm font-medium">Start Time</label>
+                                    <select id="start-time" class="p-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"></select>
+                                </div>
+                                <!-- End Time -->
+                                <div class="flex justify-between items-center p-3 rounded-lg bg-gray-100">
+                                    <label for="end-time" class="text-sm font-medium">End Time</label>
+                                    <select id="end-time" class="p-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"></select>
+                                </div>
                             </div>
                         </div>
                         <!-- Custom Color Picker -->
@@ -158,6 +176,10 @@
             const showTimeToggle = document.getElementById('show-time-toggle');
             const notePositionSelect = document.getElementById('note-position');
             const wrapper = document.getElementById('timetable-container-wrapper');
+            const customTimeToggle = document.getElementById('custom-time-toggle');
+            const timeRangeControls = document.getElementById('time-range-controls');
+            const startTimeSelect = document.getElementById('start-time');
+            const endTimeSelect = document.getElementById('end-time');
 
             // State
             let parsedCourses = [];
@@ -179,6 +201,54 @@
             };
 
             // --- Core Functions ---
+
+            /**
+             * Populates the time dropdowns with 1-hour increments.
+             */
+            function populateTimeSelects() {
+                const times = [];
+                for (let hour = 7; hour <= 23; hour++) {
+                    const h = hour.toString().padStart(2, '0');
+                    times.push(`${h}:00`);
+                }
+
+                startTimeSelect.innerHTML = times.map(time => `<option value="${time}">${time}</option>`).join('');
+                endTimeSelect.innerHTML = times.map(time => `<option value="${time}">${time}</option>`).join('');
+            }
+            populateTimeSelects();
+
+            /**
+             * Finds the earliest and latest class times from the parsed data.
+             */
+            function findMinMaxTimes(courses) {
+                if (courses.length === 0) {
+                    return { minTime: '08:00', maxTime: '22:00' };
+                }
+                
+                let minTime = '23:59';
+                let maxTime = '00:00';
+
+                courses.forEach(course => {
+                    if (course.startTime < minTime) {
+                        minTime = course.startTime;
+                    }
+                    if (course.endTime > maxTime) {
+                        maxTime = course.endTime;
+                    }
+                });
+
+                // Round down minTime to the nearest hour
+                const minH = parseInt(minTime.split(':')[0]);
+                const newMinTime = `${minH.toString().padStart(2, '0')}:00`;
+                
+                // Round up maxTime to the nearest hour
+                const maxH = parseInt(maxTime.split(':')[0]);
+                const maxM = parseInt(maxTime.split(':')[1]);
+                const newMaxH = maxM > 0 ? maxH + 1 : maxH;
+                const newMaxTime = `${newMaxH.toString().padStart(2, '0')}:00`;
+
+                return { minTime: newMinTime, maxTime: newMaxTime };
+            }
 
             /**
              * Determines if a background color is light or dark for text contrast.
@@ -269,23 +339,23 @@
                 const days = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
                 if (hasSaturday) days.push('SAT');
 
-                let minHour = 24;
-                let maxHour = 0;
-                parsedCourses.forEach(course => {
-                    const startHour = parseInt(course.startTime.split(':')[0]);
-                    const [endH_orig, endM_orig] = course.endTime.split(':').map(Number);
-                    const endHour = endM_orig > 0 ? endH_orig + 1 : endH_orig;
-                    if (startHour < minHour) minHour = startHour;
-                    if (endHour > maxHour) maxHour = endHour;
-                });
-                
-                if (minHour > maxHour) { minHour = 8; maxHour = 18; }
-                if (isMobile) {
-                    minHour = 8;
-                    maxHour = 22;
+                let minTime, maxTime;
+                if (customTimeToggle.checked) {
+                    minTime = startTimeSelect.value;
+                    maxTime = endTimeSelect.value;
+                } else {
+                    const { minTime: autoMin, maxTime: autoMax } = findMinMaxTimes(parsedCourses);
+                    minTime = autoMin;
+                    maxTime = autoMax;
+                    // Also set dropdowns to show the auto-detected times
+                    startTimeSelect.value = autoMin;
+                    endTimeSelect.value = autoMax;
                 }
-
-                const hourHeight = 80; // Fixed value since slider is removed
+                
+                const minHour = parseInt(minTime.split(':')[0]);
+                const maxHour = parseInt(maxTime.split(':')[0]);
+                
+                const hourHeight = 80; // Fixed height for each hour slot
                 const isTimetableDark = wrapper.classList.contains('timetable-dark');
                 const showTimes = showTimeToggle.checked;
                 const notePosition = notePositionSelect.value;
@@ -341,11 +411,11 @@
 
                     const [startH, startM] = course.startTime.split(':').map(Number);
                     const [endH_orig, endM_orig] = course.endTime.split(':').map(Number);
-                    const endH = endM_orig > 0 ? endH_orig + 1 : endH_orig;
-                    const endM = 0;
 
+                    // Calculate height based on rounding up to the next full hour
+                    const endH_rounded = endM_orig > 0 ? endH_orig + 1 : endH_orig;
                     const top = ((startH - minHour) * 60 + startM) / 60 * hourHeight;
-                    const durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+                    const durationMinutes = (endH_rounded * 60) - (startH * 60 + startM);
                     const height = (durationMinutes / 60) * hourHeight;
                     
                     if (top < 0 || top + height > (maxHour - minHour) * hourHeight) return;
@@ -489,6 +559,7 @@
                 });
             });
 
+            // Update listeners for instant rendering
             colorPaletteSelect.addEventListener('change', () => {
                 customColorsContainer.classList.toggle('hidden', colorPaletteSelect.value !== 'custom');
                 if (parsedCourses.length > 0) renderTimetable();
@@ -506,6 +577,23 @@
                  if (parsedCourses.length > 0) renderTimetable();
             });
             
+            showTimeToggle.addEventListener('change', () => {
+                if (parsedCourses.length > 0) renderTimetable();
+            });
+
+            customTimeToggle.addEventListener('change', () => {
+                timeRangeControls.classList.toggle('hidden', !customTimeToggle.checked);
+                if (parsedCourses.length > 0) renderTimetable();
+            });
+
+            startTimeSelect.addEventListener('change', () => {
+                if (parsedCourses.length > 0 && customTimeToggle.checked) renderTimetable();
+            });
+
+            endTimeSelect.addEventListener('change', () => {
+                if (parsedCourses.length > 0 && customTimeToggle.checked) renderTimetable();
+            });
+
             // Initial sample data for demonstration
             dataInput.value = `
 Course Title: Imaging Anatomy | Credits: 0.0 | Credit type: Letter Grade
@@ -577,4 +665,3 @@ REGISTERED
         </script>
 </body>
 </html>
-
